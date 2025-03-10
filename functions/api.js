@@ -10,7 +10,7 @@ import rateLimit from 'express-rate-limit';
 
 dotenv.config();
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __functionDirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 // Rate limiting 설정
