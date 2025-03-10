@@ -159,11 +159,42 @@ const createGoogleClient = (auth) => {
   };
 };
 
+// Netlify 서버리스 함수에서 경로 접두사 설정
+const router = express.Router();
+app.use('/.netlify/functions/api', router);
+
 // Routes
-app.get('/', (req, res) => {
+router.get('/', (req, res) => {
   res.send('GPT Google OAuth Server');
 });
 
+router.get('/auth/google',
+  passport.authenticate('google', { 
+    scope: [
+      'profile',
+      'email',
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/tasks',
+      'https://www.googleapis.com/auth/gmail.modify',
+      'https://www.googleapis.com/auth/drive.file'
+    ],
+    accessType: 'offline',
+    prompt: 'consent'
+  })
+);
+
+router.get('/auth/google/callback', 
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  function(req, res) {
+    const tokens = {
+      accessToken: req.user.accessToken,
+      refreshToken: req.user.refreshToken
+    };
+    res.json(tokens);
+  }
+);
+
+// 기존 라우트도 유지 (하위 호환성을 위해)
 app.get('/auth/google',
   passport.authenticate('google', { 
     scope: [
@@ -191,7 +222,7 @@ app.get('/auth/google/callback',
 );
 
 // Calendar API Routes
-app.get('/api/calendar/events', tokenMiddleware, async (req, res, next) => {
+router.get('/api/calendar/events', tokenMiddleware, async (req, res, next) => {
   try {
     const { calendar } = createGoogleClient(req.auth);
     const events = await calendar.events.list({
@@ -208,7 +239,7 @@ app.get('/api/calendar/events', tokenMiddleware, async (req, res, next) => {
   }
 });
 
-app.post('/api/calendar/events', tokenMiddleware, async (req, res, next) => {
+router.post('/api/calendar/events', tokenMiddleware, async (req, res, next) => {
   try {
     const { calendar } = createGoogleClient(req.auth);
     const event = await calendar.events.insert({
@@ -223,7 +254,7 @@ app.post('/api/calendar/events', tokenMiddleware, async (req, res, next) => {
 });
 
 // Tasks API Routes
-app.get('/api/tasks/lists', tokenMiddleware, async (req, res, next) => {
+router.get('/api/tasks/lists', tokenMiddleware, async (req, res, next) => {
   try {
     const { tasks } = createGoogleClient(req.auth);
     const taskLists = await tasks.tasklists.list();
@@ -235,7 +266,7 @@ app.get('/api/tasks/lists', tokenMiddleware, async (req, res, next) => {
 });
 
 // Gmail API Routes
-app.get('/api/gmail/messages', tokenMiddleware, async (req, res, next) => {
+router.get('/api/gmail/messages', tokenMiddleware, async (req, res, next) => {
   try {
     const { gmail } = createGoogleClient(req.auth);
     const messages = await gmail.users.messages.list({
@@ -250,7 +281,7 @@ app.get('/api/gmail/messages', tokenMiddleware, async (req, res, next) => {
 });
 
 // Drive API Routes
-app.get('/api/drive/files', tokenMiddleware, async (req, res, next) => {
+router.get('/api/drive/files', tokenMiddleware, async (req, res, next) => {
   try {
     const { drive } = createGoogleClient(req.auth);
     const files = await drive.files.list({
