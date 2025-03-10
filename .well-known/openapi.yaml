@@ -353,13 +353,80 @@ paths:
           description: Confirmation of file deletion
 
 components:
+  schemas:
+    CalendarEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        summary:
+          type: string
+        description:
+          type: string
+        start:
+          type: object
+          properties:
+            dateTime:
+              type: string
+              format: date-time
+            timeZone:
+              type: string
+        end:
+          type: object
+          properties:
+            dateTime:
+              type: string
+              format: date-time
+            timeZone:
+              type: string
+    TaskList:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        notes:
+          type: string
+        due:
+          type: string
+          format: date-time
+    EmailMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        threadId:
+          type: string
+        subject:
+          type: string
+        snippet:
+          type: string
+    DriveFile:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        mimeType:
+          type: string
+        webViewLink:
+          type: string
   securitySchemes:
     OAuth2:
       type: oauth2
       flows:
         authorizationCode:
-          authorizationUrl: https://ucandoai.netlify.app/auth/google
-          tokenUrl: https://ucandoai.netlify.app/auth/google/callback
+          authorizationUrl: https://ucandoai.netlify.app/.netlify/functions/api/auth/google
+          tokenUrl: https://ucandoai.netlify.app/.netlify/functions/api/auth/google/callback
           scopes:
             'https://www.googleapis.com/auth/calendar': Read and write access to Calendar
             'https://www.googleapis.com/auth/tasks': Read and write access to Tasks
