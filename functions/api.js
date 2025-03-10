@@ -106,7 +106,8 @@ const tokenMiddleware = async (req, res, next) => {
       refreshTokenPrefix: refreshToken ? refreshToken.substring(0, 10) + '...' : null,
       headers: Object.keys(req.headers),
       query: Object.keys(req.query),
-      body: req.body ? Object.keys(req.body) : null
+      body: req.body ? Object.keys(req.body) : null,
+      path: req.path
     });
 
     // 토큰 검증 시도
@@ -214,7 +215,7 @@ passport.deserializeUser((user, done) => {
 
 // Middleware
 app.use(cors({
-  origin: '*', // 모든 도메인에서의 요청 허용
+  origin: ['https://chat.openai.com', 'https://ucandoai.netlify.app', '*'], // OpenAI GPTs 및 모든 도메인에서의 요청 허용
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Refresh-Token'],
   exposedHeaders: ['X-New-Access-Token'],
@@ -289,11 +290,6 @@ router.get('/auth/google/callback',
           return res.status(500).json({ error: '로그인 과정에서 오류가 발생했습니다.', details: err.message });
         }
         
-        const tokens = {
-          accessToken: user.accessToken,
-          refreshToken: user.refreshToken
-        };
-        
         // 디버깅을 위한 로그
         console.log('인증 성공:', {
           userId: user.profile.id,
@@ -302,7 +298,19 @@ router.get('/auth/google/callback',
           hasRefreshToken: !!user.refreshToken
         });
         
-        return res.json(tokens);
+        // OpenAI GPTs에서 기대하는 응답 형식
+        const response = {
+          access_token: user.accessToken,
+          refresh_token: user.refreshToken,
+          token_type: "Bearer",
+          expires_in: 3600 // 1시간
+        };
+        
+        // Content-Type 헤더 설정
+        res.setHeader('Content-Type', 'application/json');
+        
+        // 응답 반환
+        return res.json(response);
       });
     })(req, res, next);
   }
@@ -343,11 +351,6 @@ app.get('/auth/google/callback',
           return res.status(500).json({ error: '로그인 과정에서 오류가 발생했습니다.', details: err.message });
         }
         
-        const tokens = {
-          accessToken: user.accessToken,
-          refreshToken: user.refreshToken
-        };
-        
         // 디버깅을 위한 로그
         console.log('인증 성공:', {
           userId: user.profile.id,
@@ -356,7 +359,19 @@ app.get('/auth/google/callback',
           hasRefreshToken: !!user.refreshToken
         });
         
-        return res.json(tokens);
+        // OpenAI GPTs에서 기대하는 응답 형식
+        const response = {
+          access_token: user.accessToken,
+          refresh_token: user.refreshToken,
+          token_type: "Bearer",
+          expires_in: 3600 // 1시간
+        };
+        
+        // Content-Type 헤더 설정
+        res.setHeader('Content-Type', 'application/json');
+        
+        // 응답 반환
+        return res.json(response);
       });
     })(req, res, next);
   }
