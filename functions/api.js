@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 // import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
+import session from 'express-session';
 
 dotenv.config();
 
@@ -141,7 +142,14 @@ passport.deserializeUser((user, done) => {
 
 // Middleware
 app.use(express.json());
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: process.env.NODE_ENV === 'production' }
+}));
 app.use(passport.initialize());
+app.use(passport.session());
 
 // API 경로에 rate limiter 적용
 app.use('/api', apiLimiter);
@@ -184,13 +192,40 @@ router.get('/auth/google',
 );
 
 router.get('/auth/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  function(req, res) {
-    const tokens = {
-      accessToken: req.user.accessToken,
-      refreshToken: req.user.refreshToken
-    };
-    res.json(tokens);
+  function(req, res, next) {
+    passport.authenticate('google', function(err, user, info) {
+      if (err) {
+        console.error('OAuth 콜백 오류:', err);
+        return res.status(500).json({ error: '인증 과정에서 오류가 발생했습니다.', details: err.message });
+      }
+      
+      if (!user) {
+        console.error('사용자 인증 실패:', info);
+        return res.status(401).json({ error: '사용자 인증에 실패했습니다.' });
+      }
+      
+      req.logIn(user, function(err) {
+        if (err) {
+          console.error('로그인 오류:', err);
+          return res.status(500).json({ error: '로그인 과정에서 오류가 발생했습니다.', details: err.message });
+        }
+        
+        const tokens = {
+          accessToken: user.accessToken,
+          refreshToken: user.refreshToken
+        };
+        
+        // 디버깅을 위한 로그
+        console.log('인증 성공:', {
+          userId: user.profile.id,
+          email: user.profile.emails?.[0]?.value,
+          hasAccessToken: !!user.accessToken,
+          hasRefreshToken: !!user.refreshToken
+        });
+        
+        return res.json(tokens);
+      });
+    })(req, res, next);
   }
 );
 
@@ -211,13 +246,40 @@ app.get('/auth/google',
 );
 
 app.get('/auth/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  function(req, res) {
-    const tokens = {
-      accessToken: req.user.accessToken,
-      refreshToken: req.user.refreshToken
-    };
-    res.json(tokens);
+  function(req, res, next) {
+    passport.authenticate('google', function(err, user, info) {
+      if (err) {
+        console.error('OAuth 콜백 오류:', err);
+        return res.status(500).json({ error: '인증 과정에서 오류가 발생했습니다.', details: err.message });
+      }
+      
+      if (!user) {
+        console.error('사용자 인증 실패:', info);
+        return res.status(401).json({ error: '사용자 인증에 실패했습니다.' });
+      }
+      
+      req.logIn(user, function(err) {
+        if (err) {
+          console.error('로그인 오류:', err);
+          return res.status(500).json({ error: '로그인 과정에서 오류가 발생했습니다.', details: err.message });
+        }
+        
+        const tokens = {
+          accessToken: user.accessToken,
+          refreshToken: user.refreshToken
+        };
+        
+        // 디버깅을 위한 로그
+        console.log('인증 성공:', {
+          userId: user.profile.id,
+          email: user.profile.emails?.[0]?.value,
+          hasAccessToken: !!user.accessToken,
+          hasRefreshToken: !!user.refreshToken
+        });
+        
+        return res.json(tokens);
+      });
+    })(req, res, next);
   }
 );
 
