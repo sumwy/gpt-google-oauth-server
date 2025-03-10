@@ -1,0 +1,17 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "functions"
+
+[dev]
+  command = "npm run dev"
+  port = 3000
+
+[[redirects]]
+  from = "/*"
+  to = "/server.js"
+  status = 200
+  force = true
+
+[build.environment]
+  NODE_VERSION = "18" 

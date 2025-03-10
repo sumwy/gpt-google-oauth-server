@@ -1,0 +1,21 @@
+# 의존성 디렉토리
+node_modules/
+
+# 환경 변수 파일
+.env
+
+# 빌드 디렉토리
+dist/
+
+# 로그 파일
+*.log
+
+# 운영체제 파일
+.DS_Store
+Thumbs.db
+
+# 에디터 설정
+.vscode/
+.idea/
+*.swp
+*.swo
