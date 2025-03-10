@@ -5,12 +5,13 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
+// import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
 
 dotenv.config();
 
-const __functionDirname = path.dirname(fileURLToPath(import.meta.url));
+// Netlify 서버리스 함수 환경에서는 import.meta.url이 작동하지 않으므로 제거
+// const __functionDirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 // Rate limiting 설정
