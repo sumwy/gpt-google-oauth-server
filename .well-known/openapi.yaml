@@ -1,4 +1,4 @@
-openapi: 3.0.1
+openapi: 3.1.0
 info:
   title: Google Services Plugin
   description: A plugin that allows ChatGPT to interact with Google Calendar, Tasks, Gmail, and Drive
@@ -6,6 +6,40 @@ info:
 servers:
   - url: https://ucandoai.netlify.app/.netlify/functions/api
 paths:
+  /test:
+    get:
+      operationId: testServer
+      summary: Test server connection
+      description: Tests if the server is running properly
+      responses:
+        '200':
+          description: Server status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+  
+  /api/user/profile:
+    get:
+      operationId: getUserProfile
+      summary: Get user profile
+      description: Retrieves the user's Google profile information
+      security:
+        - OAuth2: []
+      responses:
+        '200':
+          description: User profile information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+  
   /api/calendar/events:
     get:
       operationId: getCalendarEvents
@@ -419,6 +453,15 @@ components:
         mimeType:
           type: string
         webViewLink:
+          type: string
+    UserProfile:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        picture:
           type: string
   securitySchemes:
     OAuth2:
