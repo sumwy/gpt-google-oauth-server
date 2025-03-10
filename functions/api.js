@@ -98,17 +98,15 @@ const tokenMiddleware = async (req, res, next) => {
       refreshToken = req.body.refresh_token;
     }
     
-    if (!refreshToken) {
-      console.error('리프레시 토큰 없음');
-      // 리프레시 토큰이 없어도 일단 액세스 토큰으로 시도
-    }
-    
     // 디버깅을 위한 로그
     console.log('토큰 정보:', {
       hasAccessToken: !!accessToken,
       accessTokenPrefix: accessToken ? accessToken.substring(0, 10) + '...' : null,
       hasRefreshToken: !!refreshToken,
-      refreshTokenPrefix: refreshToken ? refreshToken.substring(0, 10) + '...' : null
+      refreshTokenPrefix: refreshToken ? refreshToken.substring(0, 10) + '...' : null,
+      headers: Object.keys(req.headers),
+      query: Object.keys(req.query),
+      body: req.body ? Object.keys(req.body) : null
     });
 
     // 토큰 검증 시도
@@ -118,6 +116,8 @@ const tokenMiddleware = async (req, res, next) => {
         process.env.GOOGLE_CLIENT_SECRET,
         "https://ucandoai.netlify.app/.netlify/functions/api/auth/google/callback"
       );
+      
+      // 액세스 토큰 설정
       auth.setCredentials({ 
         access_token: accessToken,
         refresh_token: refreshToken
@@ -125,6 +125,13 @@ const tokenMiddleware = async (req, res, next) => {
       
       // 토큰이 유효하면 다음 미들웨어로 진행
       req.auth = auth;
+      
+      // 토큰 정보를 응답 헤더에 추가 (디버깅용)
+      res.setHeader('x-debug-access-token', accessToken.substring(0, 10) + '...');
+      if (refreshToken) {
+        res.setHeader('x-debug-refresh-token', refreshToken.substring(0, 10) + '...');
+      }
+      
       next();
     } catch (error) {
       console.error('토큰 검증 오류:', error);
@@ -132,7 +139,10 @@ const tokenMiddleware = async (req, res, next) => {
       // 토큰이 만료되었거나 유효하지 않은 경우
       if (error.code === 401 || error.message.includes('invalid_token')) {
         if (!refreshToken) {
-          return res.status(401).json({ error: '인증이 만료되었습니다. 리프레시 토큰이 필요합니다.' });
+          return res.status(401).json({ 
+            error: '인증이 만료되었습니다. 리프레시 토큰이 필요합니다.',
+            code: 'TOKEN_EXPIRED_NO_REFRESH'
+          });
         }
         
         try {
@@ -158,15 +168,24 @@ const tokenMiddleware = async (req, res, next) => {
           next();
         } catch (refreshError) {
           console.error('토큰 리프레시 오류:', refreshError);
-          return res.status(401).json({ error: '인증이 만료되었습니다. 다시 로그인해주세요.' });
+          return res.status(401).json({ 
+            error: '인증이 만료되었습니다. 다시 로그인해주세요.',
+            code: 'TOKEN_REFRESH_FAILED'
+          });
         }
       } else {
-        return res.status(401).json({ error: '유효하지 않은 인증 토큰입니다.' });
+        return res.status(401).json({ 
+          error: '유효하지 않은 인증 토큰입니다.',
+          code: 'INVALID_TOKEN'
+        });
       }
     }
   } catch (error) {
     console.error('인증 처리 중 오류:', error);
-    return res.status(500).json({ error: '인증 처리 중 오류가 발생했습니다.' });
+    return res.status(500).json({ 
+      error: '인증 처리 중 오류가 발생했습니다.',
+      code: 'AUTH_PROCESSING_ERROR'
+    });
   }
 };
 
@@ -425,6 +444,19 @@ router.get('/test', (req, res) => {
   res.json({
     message: '서버가 정상적으로 작동 중입니다.',
     timestamp: new Date().toISOString()
+  });
+});
+
+// 토큰 테스트 엔드포인트 추가
+router.get('/test/token', tokenMiddleware, (req, res) => {
+  res.json({
+    message: '토큰이 유효합니다.',
+    timestamp: new Date().toISOString(),
+    tokenInfo: {
+      hasAuth: !!req.auth,
+      hasAccessToken: !!req.auth.credentials.access_token,
+      hasRefreshToken: !!req.auth.credentials.refresh_token
+    }
   });
 });
 
