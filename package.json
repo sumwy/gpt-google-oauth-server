@@ -6,7 +6,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "build": "mkdir -p dist && cp -r .well-known package.json server.js .env dist/",
-    "build:functions": "mkdir -p dist/functions && cp -r functions/* dist/functions/",
+    "build:functions": "mkdir -p dist/functions && cp -r functions/api.js functions/package.json functions/node_modules dist/functions/",
     "deploy": "npm run build && npm run build:functions && netlify deploy --prod"
   },
   "dependencies": {
