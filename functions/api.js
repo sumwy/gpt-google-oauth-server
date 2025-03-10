@@ -40,7 +40,7 @@ const authLimiter = rateLimit({
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
-  "/.netlify/functions/api/auth/google/callback"
+  "https://ucandoai.netlify.app/.netlify/functions/api/auth/google/callback"
 );
 
 // 토큰 리프레시 함수
@@ -120,7 +120,7 @@ const tokenMiddleware = async (req, res, next) => {
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "/.netlify/functions/api/auth/google/callback"
+    callbackURL: "https://ucandoai.netlify.app/.netlify/functions/api/auth/google/callback"
   },
   function(accessToken, refreshToken, profile, cb) {
     return cb(null, {
