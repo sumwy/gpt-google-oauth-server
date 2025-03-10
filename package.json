@@ -14,7 +14,8 @@
     "passport-google-oauth20": "^2.0.0",
     "dotenv": "^16.3.1",
     "googleapis": "^129.0.0",
-    "serverless-http": "^3.2.0"
+    "serverless-http": "^3.2.0",
+    "express-rate-limit": "^7.1.5"
   },
   "devDependencies": {
     "@netlify/functions": "^2.4.1"
