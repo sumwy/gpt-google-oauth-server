@@ -8,6 +8,7 @@ import path from 'path';
 // import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
 import session from 'express-session';
+import cors from 'cors';
 
 dotenv.config();
 
@@ -62,38 +63,88 @@ async function refreshAccessToken(refreshToken) {
 // 토큰 검증 및 리프레시 미들웨어
 const tokenMiddleware = async (req, res, next) => {
   try {
-    // 인증 헤더 확인
+    // 인증 헤더 확인 (Bearer 토큰 또는 일반 토큰)
+    let accessToken = null;
     const authHeader = req.headers.authorization;
-    if (!authHeader) {
+    
+    if (authHeader) {
+      // Bearer 토큰 형식인 경우 (Bearer xxxxx)
+      if (authHeader.startsWith('Bearer ')) {
+        accessToken = authHeader.substring(7);
+      } else {
+        // 일반 토큰인 경우
+        accessToken = authHeader;
+      }
+    } else if (req.query.access_token) {
+      // 쿼리 파라미터로 전달된 경우
+      accessToken = req.query.access_token;
+    } else if (req.body && req.body.access_token) {
+      // 요청 본문으로 전달된 경우
+      accessToken = req.body.access_token;
+    }
+    
+    if (!accessToken) {
+      console.error('인증 토큰 없음');
       return res.status(401).json({ error: '인증 토큰이 필요합니다.' });
     }
-
-    // 리프레시 토큰 확인
-    const refreshToken = req.headers['x-refresh-token'];
-    if (!refreshToken) {
-      return res.status(401).json({ error: '리프레시 토큰이 필요합니다.' });
+    
+    // 리프레시 토큰 확인 (여러 소스에서 확인)
+    let refreshToken = null;
+    if (req.headers['x-refresh-token']) {
+      refreshToken = req.headers['x-refresh-token'];
+    } else if (req.query.refresh_token) {
+      refreshToken = req.query.refresh_token;
+    } else if (req.body && req.body.refresh_token) {
+      refreshToken = req.body.refresh_token;
     }
+    
+    if (!refreshToken) {
+      console.error('리프레시 토큰 없음');
+      // 리프레시 토큰이 없어도 일단 액세스 토큰으로 시도
+    }
+    
+    // 디버깅을 위한 로그
+    console.log('토큰 정보:', {
+      hasAccessToken: !!accessToken,
+      accessTokenPrefix: accessToken ? accessToken.substring(0, 10) + '...' : null,
+      hasRefreshToken: !!refreshToken,
+      refreshTokenPrefix: refreshToken ? refreshToken.substring(0, 10) + '...' : null
+    });
 
     // 토큰 검증 시도
     try {
-      const auth = new google.auth.OAuth2();
-      auth.setCredentials({ access_token: authHeader });
-      
-      // 토큰 검증을 위한 간단한 API 호출
-      const tokenInfo = await auth.getTokenInfo(authHeader);
+      const auth = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        "https://ucandoai.netlify.app/.netlify/functions/api/auth/google/callback"
+      );
+      auth.setCredentials({ 
+        access_token: accessToken,
+        refresh_token: refreshToken
+      });
       
       // 토큰이 유효하면 다음 미들웨어로 진행
       req.auth = auth;
       next();
     } catch (error) {
+      console.error('토큰 검증 오류:', error);
+      
       // 토큰이 만료되었거나 유효하지 않은 경우
       if (error.code === 401 || error.message.includes('invalid_token')) {
+        if (!refreshToken) {
+          return res.status(401).json({ error: '인증이 만료되었습니다. 리프레시 토큰이 필요합니다.' });
+        }
+        
         try {
           // 리프레시 토큰으로 새 액세스 토큰 발급
           const credentials = await refreshAccessToken(refreshToken);
           
           // 새 토큰으로 인증 객체 설정
-          const auth = new google.auth.OAuth2();
+          const auth = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET,
+            "https://ucandoai.netlify.app/.netlify/functions/api/auth/google/callback"
+          );
           auth.setCredentials({ 
             access_token: credentials.access_token,
             refresh_token: refreshToken
@@ -106,6 +157,7 @@ const tokenMiddleware = async (req, res, next) => {
           req.auth = auth;
           next();
         } catch (refreshError) {
+          console.error('토큰 리프레시 오류:', refreshError);
           return res.status(401).json({ error: '인증이 만료되었습니다. 다시 로그인해주세요.' });
         }
       } else {
@@ -113,6 +165,7 @@ const tokenMiddleware = async (req, res, next) => {
       }
     }
   } catch (error) {
+    console.error('인증 처리 중 오류:', error);
     return res.status(500).json({ error: '인증 처리 중 오류가 발생했습니다.' });
   }
 };
@@ -141,6 +194,13 @@ passport.deserializeUser((user, done) => {
 });
 
 // Middleware
+app.use(cors({
+  origin: '*', // 모든 도메인에서의 요청 허용
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Refresh-Token'],
+  exposedHeaders: ['X-New-Access-Token'],
+  credentials: true
+}));
 app.use(express.json());
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
@@ -286,6 +346,7 @@ app.get('/auth/google/callback',
 // Calendar API Routes
 router.get('/api/calendar/events', tokenMiddleware, async (req, res, next) => {
   try {
+    console.log('캘린더 이벤트 요청 처리 중...');
     const { calendar } = createGoogleClient(req.auth);
     const events = await calendar.events.list({
       calendarId: 'primary',
@@ -295,8 +356,10 @@ router.get('/api/calendar/events', tokenMiddleware, async (req, res, next) => {
       orderBy: 'startTime',
     });
     
+    console.log('캘린더 이벤트 조회 성공:', events.data.items?.length || 0);
     res.json(events.data);
   } catch (error) {
+    console.error('캘린더 이벤트 조회 오류:', error);
     next(error);
   }
 });
@@ -353,6 +416,32 @@ router.get('/api/drive/files', tokenMiddleware, async (req, res, next) => {
     
     res.json(files.data);
   } catch (error) {
+    next(error);
+  }
+});
+
+// 테스트 엔드포인트 추가
+router.get('/test', (req, res) => {
+  res.json({
+    message: '서버가 정상적으로 작동 중입니다.',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 사용자 정보 엔드포인트 추가
+router.get('/api/user/profile', tokenMiddleware, async (req, res, next) => {
+  try {
+    console.log('사용자 프로필 요청 처리 중...');
+    const oauth2 = google.oauth2({
+      auth: req.auth,
+      version: 'v2'
+    });
+    
+    const userInfo = await oauth2.userinfo.get();
+    console.log('사용자 프로필 조회 성공');
+    res.json(userInfo.data);
+  } catch (error) {
+    console.error('사용자 프로필 조회 오류:', error);
     next(error);
   }
 });
